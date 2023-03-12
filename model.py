@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 from torch.nn import Linear
 import torch.nn.functional as F 
-from torch_geometric.nn import GATConv, GCNConv
+from torch_geometric.nn import GATConv, GCNConv, SAGEConv
+from gps import GPSConv
 from torch_geometric.datasets import WikiCS
-embedding_size = 1024
+embedding_size = 256
 graph = WikiCS(root=".")[0]
 
 class GCN(torch.nn.Module):
@@ -35,6 +36,62 @@ class GCN(torch.nn.Module):
 
         return in_graph.out(in_graph.fc(emb))
     
+class GraphSAGE(torch.nn.Module):
+    def __init__(in_graph):
+        # Init parent
+        super(GraphSAGE, in_graph).__init__()
+
+        # GCN layers
+        in_graph.dropout = nn.Dropout(p=0.5)
+        in_graph.initial_conv = SAGEConv(graph.num_features, embedding_size)
+        in_graph.conv1 = SAGEConv(embedding_size, embedding_size)
+
+        # Output layer
+        in_graph.fc = Linear(embedding_size, 10)
+        in_graph.out = nn.Softmax()
+        # in_graph.explainer_config = ('model',
+        #     'attributes',
+        #     'object')
+        # in_graph.model_config = ('classification',
+        #     'node',
+        #     'log_probs'  # Model returns log probabilities.
+        # )
+
+    def forward(in_graph, x, edge_index):
+        emb = in_graph.dropout(x)
+        emb = F.relu(in_graph.initial_conv(emb, edge_index))
+        emb = F.relu(in_graph.conv1(emb, edge_index))
+
+        return in_graph.out(in_graph.fc(emb))
+    
+class GPS(torch.nn.Module):
+    def __init__(in_graph):
+        # Init parent
+        super(GPS, in_graph).__init__()
+
+        # GCN layers
+        in_graph.dropout = nn.Dropout(p=0.5)
+        in_graph.initial_conv = GPSConv(graph.num_features, embedding_size)
+        in_graph.conv1 = GPSConv(embedding_size, embedding_size)
+
+        # Output layer
+        in_graph.fc = Linear(embedding_size, 10)
+        in_graph.out = nn.Softmax()
+        # in_graph.explainer_config = ('model',
+        #     'attributes',
+        #     'object')
+        # in_graph.model_config = ('classification',
+        #     'node',
+        #     'log_probs'  # Model returns log probabilities.
+        # )
+
+    def forward(in_graph, x, edge_index):
+        emb = in_graph.dropout(x)
+        emb = F.relu(in_graph.initial_conv(emb, edge_index))
+        emb = F.relu(in_graph.conv1(emb, edge_index))
+
+        return in_graph.out(in_graph.fc(emb))
+
 class GAT(torch.nn.Module):
     def __init__(in_graph):
         # Init parent
